@@ -105,6 +105,7 @@
         const PASES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRW0_eOhvww0shRHZAB9ntuRgOTLt93aXLParjtRahIafff_82bezHcnkp5THc02vNFqGRFaiEkzRoW/pub?gid=273980370&single=true&output=csv"; 
         const LOCAL_BRIDGE_URL = "http://localhost:3000/abrir-puerta"; 
 
+        let invitadosQueYaEntraron = []; // Aquí guardaremos los DNI que ya cruzaron la puerta hoy
         let sociosDB = [];
         let pasesDiariosDB = [];
         let fotosDB = {};
@@ -164,12 +165,22 @@
         }
 
         async function validarSocio(id) {
-            // 1. Verificación de Pase Diario
-            if (pasesDiariosDB.includes(id)) {
-                mostrarUI({ nombre: "INVITADO PASE DIARIO", dni: id }, "ACCESO AUTORIZADO", true);
-                abrirPuertaReal();
-                return;
-            }
+    // 1. ¿Es un invitado de Pase Diario?
+    if (pasesDiariosDB.includes(id)) {
+        
+        // REGLA DE ORO: ¿Ya entró hoy?
+        if (invitadosQueYaEntraron.includes(id)) {
+            sonidoError.play();
+            mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: id }, "PASE YA UTILIZADO", false);
+            return; // Bloqueamos el acceso
+        }
+
+        // Si es su primera vez hoy:
+        invitadosQueYaEntraron.push(id); // Lo anotamos en la lista negra temporal
+        mostrarUI({ nombre: "INVITADO PASE DIARIO", dni: id }, "ACCESO AUTORIZADO", true);
+        abrirPuertaReal();
+        return;
+    }
 
             // 2. Verificación de Socios
             const registrosSocio = sociosDB.filter(s => s.dni == id || s.numeroSocio == id);
