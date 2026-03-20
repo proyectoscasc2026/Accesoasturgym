@@ -115,9 +115,17 @@
         const sonidoError = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
 
         window.onload = () => { 
-            sincronizarSheets();
-            document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
-        };
+    sincronizarSheets(); // Primera sincronización al abrir
+    document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
+    checkServerStatus();
+
+    // --- AUTOSINCRO CADA 30 MINUTOS ---
+    // 30 minutos * 60 segundos * 1000 milisegundos = 1.800.000
+    setInterval(() => {
+        console.log("Sincronización automática iniciada...");
+        sincronizarSheets();
+    }, 1800000); 
+};
 
         document.addEventListener('DOMContentLoaded', () => {
             const botonSincro = document.getElementById('btn-sincronizar');
