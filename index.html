@@ -31,6 +31,13 @@
         
         .animate-fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Imagen neutra por defecto para socios sin foto */
+        #res-foto[src*="avatar_neutro.png"] {
+            background-color: #e5e7eb; /* Un gris muy suave (gray-200 de Tailwind) */
+            padding: 2rem; /* Espaciado para que el icono no toque los bordes */
+            object-fit: contain; /* Asegura que el icono no se deforme */
+        }
     </style>
 </head>
 <body class="flex items-center justify-center p-6">
@@ -48,7 +55,7 @@
                 
                 <div id="display-result" class="hidden mt-6 p-6 bg-white border-8 access-card relative shadow-2xl shadow-black/50">
                     <div class="flex items-center gap-8">
-                        <img id="res-foto" src="https://www.w3schools.com/howto/img_avatar.png" class="w-44 h-44 rounded-2xl object-cover shadow-lg">
+                        <img id="res-foto" src="https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/person/default/48px.svg" class="w-44 h-44 rounded-2xl object-cover shadow-lg border-4 border-gray-100/50">
                         <div class="text-left flex-1">
                             <h2 id="res-nombre" class="text-4xl font-black uppercase text-gray-800 leading-tight border-b-2 border-gray-100 pb-2 mb-2"></h2>
                             <p id="res-dni" class="text-xl font-bold text-gray-500 mb-4 uppercase tracking-tighter"></p>
@@ -232,7 +239,7 @@
             
             document.getElementById('res-nombre').textContent = socio.nombre;
             document.getElementById('res-dni').textContent = `DNI: ${socio.dni}`;
-            document.getElementById('res-foto').src = fotosDB[socio.dni] || "https://www.w3schools.com/howto/img_avatar.png";
+            document.getElementById('res-foto').src = fotosDB[socio.dni] || "https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/person/default/48px.svg";
             
             badge.textContent = status;
             badge.className = `inline-block px-6 py-2 rounded-xl text-2xl font-black text-white ${exito ? 'bg-green-600' : 'bg-red-600'}`;
