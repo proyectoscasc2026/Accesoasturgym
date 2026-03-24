@@ -26,18 +26,21 @@
         .status-success-card { border-color: #22c55e; color: #16a34a; }
         .status-error-card { border-color: #ef4444; color: #dc2626; }
         
+        /* Animación del Reloj/Spinner */
+        .spinner {
+            animation: rotate 2s linear infinite;
+            width: 18px;
+            height: 18px;
+        }
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+
         #access-log::-webkit-scrollbar { width: 6px; }
         #access-log::-webkit-scrollbar-thumb { background: var(--astur-yellow); border-radius: 10px; }
         
         .animate-fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Imagen neutra por defecto para socios sin foto */
-        #res-foto[src*="avatar_neutro.png"] {
-            background-color: #e5e7eb; /* Un gris muy suave (gray-200 de Tailwind) */
-            padding: 2rem; /* Espaciado para que el icono no toque los bordes */
-            object-fit: contain; /* Asegura que el icono no se deforme */
-        }
     </style>
 </head>
 <body class="flex items-center justify-center p-6">
@@ -74,9 +77,14 @@
         </div>
 
         <div class="w-80 bg-black/40 backdrop-blur-md rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
-            <div class="bg-white/10 p-4 text-center border-b border-white/10">
+            <div class="bg-white/10 p-4 text-center border-b border-white/10 flex flex-col items-center">
                 <h3 class="font-black uppercase tracking-wider text-sm" style="color: var(--astur-yellow);">Ingresos Recientes</h3>
-                <p class="text-white/50 text-[10px] mt-1">Hoy: <span id="current-date-display"></span></p>
+                <div id="sync-indicator" class="flex items-center gap-2 mt-1">
+                    <span class="text-white/50 text-[10px]" id="current-date-display"></span>
+                    <div id="sync-spinner" class="hidden">
+                        <svg class="spinner" viewBox="0 0 50 50"><circle cx="25" cy="25" r="20" fill="none" stroke="#fabb00" stroke-width="5" stroke-linecap="round" stroke-dasharray="31.4, 31.4"></circle></svg>
+                    </div>
+                </div>
             </div>
             <div id="access-log" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
         </div>
@@ -91,14 +99,15 @@
                 <button onclick="cerrarAdmin()" class="w-full mt-4 text-gray-400 text-xs font-bold uppercase">Cancelar</button>
             </div>
             <div id="admin-controls" class="hidden space-y-4">
-                <button id="btn-sincronizar" class="w-full bg-green-600 text-white p-4 rounded-2xl font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">🔄 Sincronizar Excel Ahora</button>
+                <button id="btn-sincronizar" class="w-full bg-green-600 text-white p-4 rounded-2xl font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">
+                    <span id="btn-text">🔄 Sincronizar Excel Ahora</span>
+                </button>
                 <button onclick="document.getElementById('foto-uploader').click()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 shadow-lg">📸 Importar Fotos Locales</button>
                 <input type="file" id="foto-uploader" class="hidden" multiple onchange="procesarFotos(event)">
                 
                 <div class="bg-gray-100 p-3 rounded-xl text-xs mt-4">
                     <p><b>Servidor Relé:</b> <span id="server-status" class="italic">Verificando...</span></p>
-                    <p><b>Placa IP:</b> <span class="text-blue-600">192.168.0.50</span></p>
-                    <p><b>Auto-Refresco:</b> Cada 30 min</p>
+                    <p><b>Sincronización:</b> Automática (2 min)</p>
                 </div>
                 <button onclick="cerrarAdmin()" class="w-full bg-gray-200 p-4 rounded-2xl text-gray-700 font-bold uppercase">Cerrar</button>
             </div>
@@ -107,30 +116,27 @@
 
     <script>
         // --- CONFIGURACIÓN DE URLS ---
-        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRW0_eOhvww0shRHZAB9ntuRgOTLt93aXLParjtRahIafff_82bezHcnkp5THc02vNFqGRFaiEkzRoW/pub?gid=0&single=true&output=csv";
-        // REEMPLAZA ESTA URL por la de tu pestaña "Pase Diario" publicada como CSV:
-        const PASES_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRW0_eOhvww0shRHZAB9ntuRgOTLt93aXLParjtRahIafff_82bezHcnkp5THc02vNFqGRFaiEkzRoW/pub?gid=273980370&single=true&output=csv"; 
+        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTCyEdIV_bC82uoGFq1mIvJOXrvJI19KzwLVGjxyH8jYefbnHkNorxelpwTTqJ8KczrzoiiZ24dBWFj/pub?output=csv";
+        const PASES_URL = "PONER_URL_DE_TU_CSV_DE_PASES_DIARIOS"; 
         const LOCAL_BRIDGE_URL = "http://localhost:3000/abrir-puerta"; 
 
-        let invitadosQueYaEntraron = []; // Aquí guardaremos los DNI que ya cruzaron la puerta hoy
         let sociosDB = [];
         let pasesDiariosDB = [];
+        let invitadosQueYaEntraron = [];
         let fotosDB = {};
+
+        // SONIDOS
         const sonidoOk = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
         const sonidoError = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
 
         window.onload = () => { 
-    sincronizarSheets(); // Carga inicial inmediata al abrir
-    document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
-    checkServerStatus();
+            sincronizarSheets();
+            document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
+            checkServerStatus();
 
-    // --- AUTOSINCRO CADA 2 MINUTOS ---
-    // 2 minutos * 60 segundos * 1000 milisegundos = 120.000
-    setInterval(() => {
-        console.log("Sincronización automática de socios y pases (cada 2 min)...");
-        sincronizarSheets();
-    }, 120000); 
-};
+            // Autosincro cada 2 minutos
+            setInterval(sincronizarSheets, 120000); 
+        };
 
         async function checkServerStatus() {
             try {
@@ -147,56 +153,61 @@
         }
 
         async function sincronizarSheets() {
-    const btn = document.getElementById('btn-sincronizar');
-    if(btn) btn.innerHTML = "⏳ Sincronizando...";
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('sync-spinner');
+            
+            if(btnText) btnText.innerHTML = "⏳ Sincronizando...";
+            spinner.classList.remove('hidden');
 
-    // El truco: agregamos un número aleatorio (timestamp) al final de la URL
-    // Esto engaña al navegador y lo obliga a bajar la versión más nueva
-    const cacheBuster = "&t=" + new Date().getTime(); 
+            const cacheBuster = "&t=" + new Date().getTime();
 
-    try {
-        // 1. Sincronizar Socios (Fijate que sumamos el cacheBuster al final)
-        const resS = await fetch(SHEET_URL + cacheBuster);
-        const csvS = await resS.text();
-        
-        // ... (el resto del código de mapeo de socios igual)
+            try {
+                // 1. Cargar Socios
+                const resS = await fetch(SHEET_URL + cacheBuster);
+                const csvS = await resS.text();
+                sociosDB = csvS.split(/\r?\n/).slice(1).map(f => {
+                    const c = f.split(",");
+                    return { nombre: c[0]?.trim(), dni: c[1]?.trim(), numeroSocio: c[2]?.trim(), estado: c[3]?.trim().toUpperCase(), importe: c[4]?.trim() };
+                }).filter(s => s.dni);
 
-        // 2. Sincronizar Pases Diarios (También con cacheBuster)
-        const resP = await fetch(PASES_URL + cacheBuster);
-        const csvP = await resP.text();
-        
-        // ... (el resto del código de pases igual)
+                // 2. Cargar Pases Diarios
+                if (PASES_URL.includes("http")) {
+                    const resP = await fetch(PASES_URL + cacheBuster);
+                    const csvP = await resP.text();
+                    pasesDiariosDB = csvP.split(/\r?\n/).slice(1).map(f => f.trim()).filter(d => d !== "");
+                }
 
-        if(btn) btn.innerHTML = "✅ ¡Sincronizado!";
-        setTimeout(() => { if(btn) btn.innerHTML = "🔄 Sincronizar Excel Ahora"; }, 3000);
-    } catch (err) { 
-        console.error("Error de sincronización", err);
-    }
-}
-
-        async function validarSocio(id) {
-    // 1. ¿Es un invitado de Pase Diario?
-    if (pasesDiariosDB.includes(id)) {
-        
-        // REGLA DE ORO: ¿Ya entró hoy?
-        if (invitadosQueYaEntraron.includes(id)) {
-            sonidoError.play();
-            mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: id }, "PASE YA UTILIZADO", false);
-            return; // Bloqueamos el acceso
+                if(btnText) btnText.innerHTML = "✅ ¡Sincronizado!";
+                setTimeout(() => { 
+                    if(btnText) btnText.innerHTML = "🔄 Sincronizar Excel Ahora"; 
+                    spinner.classList.add('hidden');
+                }, 3000);
+            } catch (err) { 
+                console.error("Error sincronizando", err);
+                spinner.classList.add('hidden');
+            }
         }
 
-        // Si es su primera vez hoy:
-        invitadosQueYaEntraron.push(id); // Lo anotamos en la lista negra temporal
-        mostrarUI({ nombre: "INVITADO PASE DIARIO", dni: id }, "ACCESO AUTORIZADO", true);
-        abrirPuertaReal();
-        return;
-    }
+        async function validarSocio(id) {
+            // Caso 1: Pase Diario
+            if (pasesDiariosDB.includes(id)) {
+                if (invitadosQueYaEntraron.includes(id)) {
+                    reproducirSonido(false);
+                    mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: id }, "PASE YA UTILIZADO", false);
+                    return;
+                }
+                invitadosQueYaEntraron.push(id);
+                reproducirSonido(true);
+                mostrarUI({ nombre: "INVITADO PASE DIARIO", dni: id }, "ACCESO AUTORIZADO", true);
+                abrirPuertaReal();
+                return;
+            }
 
-            // 2. Verificación de Socios
+            // Caso 2: Socios
             const registrosSocio = sociosDB.filter(s => s.dni == id || s.numeroSocio == id);
             
             if (registrosSocio.length === 0) { 
-                sonidoError.play();
+                reproducirSonido(false);
                 document.body.className = "flex items-center justify-center p-6 bg-error";
                 setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
                 return; 
@@ -220,19 +231,25 @@
             }
 
             if (acceso) {
+                reproducirSonido(true);
                 mostrarUI(registrosSocio[0], statusText, true);
                 abrirPuertaReal();
             } else {
+                reproducirSonido(false);
                 mostrarUI(registrosSocio[0], statusText, false);
-                sonidoError.play();
+            }
+        }
+
+        function reproducirSonido(exito) {
+            if(exito) {
+                sonidoOk.pause(); sonidoOk.currentTime = 0; sonidoOk.play();
+            } else {
+                sonidoError.pause(); sonidoError.currentTime = 0; sonidoError.play();
             }
         }
 
         async function abrirPuertaReal() {
-            try {
-                await fetch(LOCAL_BRIDGE_URL);
-                sonidoOk.play();
-            } catch (e) { console.error("Servidor Node.js no responde"); }
+            try { fetch(LOCAL_BRIDGE_URL); } catch (e) { }
         }
 
         function mostrarUI(socio, status, exito) {
@@ -259,9 +276,7 @@
 
         function agregarAlLog(socio, exito, status) {
             const log = document.getElementById('access-log');
-            const ahora = new Date();
-            const horaStr = ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
+            const horaStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const entry = document.createElement('div');
             entry.className = `p-3 rounded-2xl border-l-4 bg-white/5 ${exito ? 'border-green-500' : 'border-red-500'} animate-fade-in text-white`;
             entry.innerHTML = `
@@ -286,8 +301,10 @@
                 reader.onload = (ev) => fotosDB[dni] = ev.target.result;
                 reader.readAsDataURL(file);
             });
-            alert("Fotos vinculadas correctamente.");
+            alert("Fotos vinculadas.");
         }
+
+        document.getElementById('btn-sincronizar').addEventListener('click', sincronizarSheets);
     </script>
 </body>
 </html>
