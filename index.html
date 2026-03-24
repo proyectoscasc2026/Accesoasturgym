@@ -147,30 +147,32 @@
         }
 
         async function sincronizarSheets() {
-            const btn = document.getElementById('btn-sincronizar');
-            if(btn) btn.innerHTML = "⏳ Sincronizando...";
+    const btn = document.getElementById('btn-sincronizar');
+    if(btn) btn.innerHTML = "⏳ Sincronizando...";
 
-            try {
-                // Sincronizar Socios
-                const resS = await fetch(SHEET_URL + "&t=" + Date.now());
-                const csvS = await resS.text();
-                sociosDB = csvS.split(/\r?\n/).slice(1).map(f => {
-                    const c = f.split(",");
-                    return { nombre: c[0]?.trim(), dni: c[1]?.trim(), numeroSocio: c[2]?.trim(), estado: c[3]?.trim().toUpperCase(), importe: c[4]?.trim() };
-                }).filter(s => s.dni);
+    // El truco: agregamos un número aleatorio (timestamp) al final de la URL
+    // Esto engaña al navegador y lo obliga a bajar la versión más nueva
+    const cacheBuster = "&t=" + new Date().getTime(); 
 
-                // Sincronizar Pases Diarios
-                const resP = await fetch(PASES_URL + "&t=" + Date.now());
-                const csvP = await resP.text();
-                pasesDiariosDB = csvP.split(/\r?\n/).slice(1).map(f => f.trim()).filter(d => d !== "");
+    try {
+        // 1. Sincronizar Socios (Fijate que sumamos el cacheBuster al final)
+        const resS = await fetch(SHEET_URL + cacheBuster);
+        const csvS = await resS.text();
+        
+        // ... (el resto del código de mapeo de socios igual)
 
-                if(btn) btn.innerHTML = "✅ ¡Sincronizado!";
-                setTimeout(() => { if(btn) btn.innerHTML = "🔄 Sincronizar Excel Ahora"; }, 3000);
-            } catch (err) { 
-                console.error("Error de sincronización", err);
-                if(btn) btn.innerHTML = "❌ Error de Conexión";
-            }
-        }
+        // 2. Sincronizar Pases Diarios (También con cacheBuster)
+        const resP = await fetch(PASES_URL + cacheBuster);
+        const csvP = await resP.text();
+        
+        // ... (el resto del código de pases igual)
+
+        if(btn) btn.innerHTML = "✅ ¡Sincronizado!";
+        setTimeout(() => { if(btn) btn.innerHTML = "🔄 Sincronizar Excel Ahora"; }, 3000);
+    } catch (err) { 
+        console.error("Error de sincronización", err);
+    }
+}
 
         async function validarSocio(id) {
     // 1. ¿Es un invitado de Pase Diario?
