@@ -117,12 +117,13 @@
             document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
             checkServerStatus();
 
-            // Sincronización automática cada 30 minutos
-            setInterval(() => {
-                console.log("Sincronizando datos automáticamente...");
-                sincronizarSheets();
-            }, 1800000); 
-        };
+// --- AUTOSINCRO CADA 5 MINUTOS ---
+    // 5 minutos * 60 segundos * 1000 milisegundos = 300.000
+    setInterval(() => {
+        console.log("Sincronización automática de socios y pases (cada 5 min)...");
+        sincronizarSheets();
+    }, 300000); 
+};
 
         async function checkServerStatus() {
             try {
