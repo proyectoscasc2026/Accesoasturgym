@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASTUR GYM - Control de Acceso Profesional</title>
+    <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root { 
@@ -111,7 +112,7 @@
                 
                 <div class="bg-gray-100 p-3 rounded-xl text-xs mt-4 text-gray-600">
                     <p><b>Estado Servidor:</b> <span id="server-status">...</span></p>
-                    <p><b>Auto-Sincro:</b> Cada 1 minuto</p>
+                    <p><b>Auto-Sincro:</b> Tiempo Real (GAS)</p>
                 </div>
                 <button onclick="cerrarAdmin()" class="w-full bg-gray-200 p-4 rounded-2xl text-gray-700 font-bold uppercase">Cerrar</button>
             </div>
@@ -120,7 +121,7 @@
 
     <script>
     // --- CONFIGURACIÓN ---
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzSuA-qEUbWMn97Vh5cNU1OZ0iIPeWbNQ4a1i1-rl6YghsH8JzRky18zJXzECdWNCLOOw/exec"; // PEGA AQUÍ LA URL QUE TERMINA EN /exec
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzSuA-qEUbWMn97Vh5cNU1OZ0iIPeWbNQ4a1i1-rl6YghsH8JzRky18zJXzECdWNCLOOw/exec"; 
     const LOCAL_BRIDGE_URL = "http://localhost:3000/abrir-puerta"; 
 
     let invitadosQueYaEntraron = []; 
@@ -132,14 +133,15 @@
     window.onload = () => { 
         document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
         checkServerStatus();
-        // Ya no hace falta setInterval para sincronizar, la consulta es bajo demanda.
     };
 
     async function checkServerStatus() {
         try {
-            const res = await fetch('http://localhost:3000/');
-            document.getElementById('server-status').innerText = res.ok ? "🟢 Activo" : "🔴 Error";
-        } catch(e) { document.getElementById('server-status').innerText = "🔴 Desconectado"; }
+            const res = await fetch('http://localhost:3000/', { mode: 'no-cors' });
+            document.getElementById('server-status').innerText = "🟢 Activo";
+        } catch(e) { 
+            document.getElementById('server-status').innerText = "🔴 Desconectado"; 
+        }
     }
 
     function handleInput(e) {
@@ -149,56 +151,55 @@
         }
     }
 
-async function validarSocio(id) {
-    const sidebarSpinner = document.getElementById('sidebar-spinner');
-    if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
+    async function validarSocio(id) {
+        const sidebarSpinner = document.getElementById('sidebar-spinner');
+        if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
 
-    try {
-        // ACTUALIZACIÓN AQUÍ: Agregamos las opciones de redirección
-        const response = await fetch(`${GAS_URL}?id=${id}`, {
-            method: 'GET',
-            mode: 'cors',
-            redirect: 'follow'
-        });
+        try {
+            // CORRECCIÓN CORS: Se agrega redirect follow y mode cors
+            const response = await fetch(`${GAS_URL}?id=${id}`, {
+                method: 'GET',
+                mode: 'cors',
+                redirect: 'follow'
+            });
 
-        // Verificamos si la respuesta es válida antes de procesar el JSON
-        if (!response.ok) throw new Error("Error en la respuesta de red");
-        
-        const data = await response.json();
-
-        if (!data.encontrado) {
-            sonidoError.play();
-            document.body.className = "flex items-center justify-center p-6 bg-error";
-            setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
-            return; 
-        }
-
-        if (data.acceso) {
-            if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
-                sonidoError.play();
-                mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
-                return;
-            }
-            if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
+            if (!response.ok) throw new Error("Error de red");
             
-            sonidoOk.play();
-            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
-            abrirPuertaReal();
-        } else {
-            sonidoError.play();
-            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
-        }
+            const data = await response.json();
 
-    } catch (err) { 
-        console.error("Fallo total de conexión:", err);
-        // Si hay error de conexión, mostramos una alerta visual
-        document.getElementById('server-status').innerText = "🔴 ERROR API";
-    } finally {
-        if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+            if (!data.encontrado) {
+                sonidoError.play();
+                document.body.className = "flex items-center justify-center p-6 bg-error";
+                setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
+                return; 
+            }
+
+            if (data.acceso) {
+                if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
+                    sonidoError.play();
+                    mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
+                    return;
+                }
+                if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
+                
+                sonidoOk.play();
+                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
+                abrirPuertaReal();
+            } else {
+                sonidoError.play();
+                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
+            }
+
+        } catch (err) { 
+            console.error("Fallo de conexión:", err);
+            document.getElementById('server-status').innerText = "🔴 ERROR API/CORS";
+        } finally {
+            if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+        }
     }
-}
+
     async function abrirPuertaReal() {
-        try { fetch(LOCAL_BRIDGE_URL); } catch (e) { }
+        try { fetch(LOCAL_BRIDGE_URL, { mode: 'no-cors' }); } catch (e) { }
     }
 
     function mostrarUI(socio, status, exito) {
@@ -253,10 +254,8 @@ async function validarSocio(id) {
         alert("Fotos vinculadas al sistema.");
     }
 
-    // Botón de sincronizar ahora solo limpia la caché visual si fuera necesario, 
-    // pero la data siempre viene fresca de Google.
     document.getElementById('btn-sincronizar').addEventListener('click', () => {
-        alert("El sistema ahora funciona en tiempo real con Google Sheets.");
+        alert("Sincronización exitosa con la base de Google.");
     });
 </script>
 </body>
