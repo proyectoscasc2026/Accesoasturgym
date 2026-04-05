@@ -149,47 +149,54 @@
         }
     }
 
-    async function validarSocio(id) {
-        const sidebarSpinner = document.getElementById('sidebar-spinner');
-        if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
+async function validarSocio(id) {
+    const sidebarSpinner = document.getElementById('sidebar-spinner');
+    if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
 
-        try {
-            // CONSULTA REAL-TIME A GOOGLE APPS SCRIPT
-            const response = await fetch(`${GAS_URL}?id=${id}`);
-            const data = await response.json();
+    try {
+        // Agregamos redirect: 'follow' para evitar bloqueos de Google
+        const response = await fetch(`${GAS_URL}?id=${id}`, {
+            method: 'GET',
+            mode: 'cors',
+            redirect: 'follow'
+        });
 
-            if (!data.encontrado) {
-                sonidoError.play();
-                document.body.className = "flex items-center justify-center p-6 bg-error";
-                setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
-                return; 
-            }
+        if (!response.ok) throw new Error("Error en la respuesta del servidor");
 
-            // Lógica de acceso procesada por el servidor
-            if (data.acceso) {
-                // Validación local solo para no repetir pases diarios ya usados en la sesión
-                if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
-                    sonidoError.play();
-                    mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
-                    return;
-                }
+        const data = await response.json();
 
-                if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
-                
-                sonidoOk.play();
-                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
-                abrirPuertaReal();
-            } else {
-                sonidoError.play();
-                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
-            }
-
-        } catch (err) { 
-            console.error("Error de conexión con la API de Google", err);
-        } finally {
-            if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+        if (!data.encontrado) {
+            sonidoError.play();
+            document.body.className = "flex items-center justify-center p-6 bg-error";
+            setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
+            return; 
         }
+
+        if (data.acceso) {
+            if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
+                sonidoError.play();
+                mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
+                return;
+            }
+
+            if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
+            
+            sonidoOk.play();
+            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
+            abrirPuertaReal();
+        } else {
+            sonidoError.play();
+            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
+        }
+
+    } catch (err) { 
+        console.error("Fallo total de conexión:", err);
+        // Opcional: Alerta visual si internet se cayó
+        document.getElementById('server-status').innerText = "🔴 ERROR API";
+    } finally {
+        if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
     }
+}
 
     async function abrirPuertaReal() {
         try { fetch(LOCAL_BRIDGE_URL); } catch (e) { }
