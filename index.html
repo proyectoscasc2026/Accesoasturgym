@@ -27,7 +27,6 @@
         .status-success-card { border-color: #22c55e; color: #16a34a; }
         .status-error-card { border-color: #ef4444; color: #dc2626; }
         
-        /* Animación del Reloj (Spinner) */
         .spinner {
             animation: rotate 2s linear infinite;
             width: 20px;
@@ -104,16 +103,11 @@
                 <button onclick="cerrarAdmin()" class="w-full mt-4 text-gray-400 text-xs font-bold uppercase">Cancelar</button>
             </div>
             <div id="admin-controls" class="hidden space-y-4">
-                <button id="btn-sincronizar" class="w-full bg-green-600 text-white p-4 rounded-2xl font-bold hover:bg-green-700 shadow-lg flex items-center justify-center gap-2">
-                    <span id="sync-icon">🔄</span> <span id="sync-text">Sincronizar Excel Ahora</span>
-                </button>
+                <div class="bg-gray-100 p-3 rounded-xl text-xs text-gray-600">
+                    <p><b>Estado Servidor:</b> <span id="server-status">...</span></p>
+                </div>
                 <button onclick="document.getElementById('foto-uploader').click()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 shadow-lg">📸 Importar Fotos Locales</button>
                 <input type="file" id="foto-uploader" class="hidden" multiple onchange="procesarFotos(event)">
-                
-                <div class="bg-gray-100 p-3 rounded-xl text-xs mt-4 text-gray-600">
-                    <p><b>Estado Servidor:</b> <span id="server-status">...</span></p>
-                    <p><b>Auto-Sincro:</b> Tiempo Real (GAS)</p>
-                </div>
                 <button onclick="cerrarAdmin()" class="w-full bg-gray-200 p-4 rounded-2xl text-gray-700 font-bold uppercase">Cerrar</button>
             </div>
         </div>
@@ -127,9 +121,6 @@
     let invitadosQueYaEntraron = []; 
     let fotosDB = {};
 
-    const sonidoOk = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-    const sonidoError = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-
     window.onload = () => { 
         document.getElementById('current-date-display').innerText = new Date().toLocaleDateString();
         checkServerStatus();
@@ -137,7 +128,7 @@
 
     async function checkServerStatus() {
         try {
-            const res = await fetch('http://localhost:3000/', { mode: 'no-cors' });
+            await fetch('http://localhost:3000/', { mode: 'no-cors' });
             document.getElementById('server-status').innerText = "🟢 Activo";
         } catch(e) { 
             document.getElementById('server-status').innerText = "🔴 Desconectado"; 
@@ -151,52 +142,48 @@
         }
     }
 
-async function validarSocio(id) {
-    const sidebarSpinner = document.getElementById('sidebar-spinner');
-    if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
+    async function validarSocio(id) {
+        const sidebarSpinner = document.getElementById('sidebar-spinner');
+        if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
 
-    try {
-        const response = await fetch(`${GAS_URL}?id=${id}`, {
-            method: 'GET',
-            mode: 'cors',
-            redirect: 'follow'
-        });
+        try {
+            const response = await fetch(`${GAS_URL}?id=${id}`, {
+                method: 'GET',
+                mode: 'cors',
+                redirect: 'follow'
+            });
 
-        if (!response.ok) throw new Error("Error en red");
-        const data = await response.json();
+            if (!response.ok) throw new Error("Error en red");
+            const data = await response.json();
 
-        if (!data.encontrado) {
-            reproducirSonido(sonidoError);
-            document.body.className = "flex items-center justify-center p-6 bg-error";
-            setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
-            return; 
-        }
-
-        // LÓGICA DE ACCESO
-        if (data.acceso) {
-            if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
-                reproducirSonido(sonidoError);
-                mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
-                return;
+            if (!data.encontrado) {
+                // UI de Error (Fondo Rojo momentáneo)
+                document.body.className = "flex items-center justify-center p-6 bg-error";
+                setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
+                return; 
             }
-            
-            // Si todo está OK:
-            reproducirSonido(sonidoOk); // Si falla, no detiene el acceso
-            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
-            abrirPuertaReal(); // Ejecutar apertura
-            
-            if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
-        } else {
-            reproducirSonido(sonidoError);
-            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
-        }
 
-    } catch (err) { 
-        console.error("Fallo crítico:", err);
-    } finally {
-        if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+            // LÓGICA DE ACCESO
+            if (data.acceso) {
+                if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
+                    mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
+                    return;
+                }
+                
+                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
+                abrirPuertaReal(); 
+                
+                if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
+            } else {
+                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
+            }
+
+        } catch (err) { 
+            console.error("Fallo crítico:", err);
+        } finally {
+            if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+        }
     }
-}
 
     async function abrirPuertaReal() {
         try { fetch(LOCAL_BRIDGE_URL, { mode: 'no-cors' }); } catch (e) { }
@@ -211,12 +198,13 @@ async function validarSocio(id) {
         document.getElementById('res-foto').src = fotosDB[socio.dni] || "https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/person/default/48px.svg";
         
         badge.textContent = status;
-        badge.className = `inline-block px-6 py-2 rounded-xl text-2xl font-black text-white ${exito ? 'bg-green-600' : 'bg-red-600'}`;
+        badge.className = `inline-block px-6 py-2 rounded-xl text-2xl font-black text-white shadow-md uppercase ${exito ? 'bg-green-600' : 'bg-red-600'}`;
         display.className = `mt-6 p-6 bg-white border-8 access-card relative shadow-2xl ${exito ? 'status-success-card' : 'status-error-card'}`;
         display.classList.remove('hidden');
         document.body.className = `flex items-center justify-center p-6 ${exito ? 'bg-success' : 'bg-error'}`;
         
         agregarAlLog(socio, exito, status);
+        
         setTimeout(() => {
             display.classList.add('hidden');
             document.body.className = "flex items-center justify-center p-6";
@@ -253,10 +241,6 @@ async function validarSocio(id) {
         });
         alert("Fotos vinculadas al sistema.");
     }
-
-    document.getElementById('btn-sincronizar').addEventListener('click', () => {
-        alert("Sincronización exitosa con la base de Google.");
-    });
 </script>
 </body>
 </html>
