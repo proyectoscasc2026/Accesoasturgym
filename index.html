@@ -151,52 +151,52 @@
         }
     }
 
-    async function validarSocio(id) {
-        const sidebarSpinner = document.getElementById('sidebar-spinner');
-        if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
+async function validarSocio(id) {
+    const sidebarSpinner = document.getElementById('sidebar-spinner');
+    if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
 
-        try {
-            // CORRECCIÓN CORS: Se agrega redirect follow y mode cors
-            const response = await fetch(`${GAS_URL}?id=${id}`, {
-                method: 'GET',
-                mode: 'cors',
-                redirect: 'follow'
-            });
+    try {
+        const response = await fetch(`${GAS_URL}?id=${id}`, {
+            method: 'GET',
+            mode: 'cors',
+            redirect: 'follow'
+        });
 
-            if (!response.ok) throw new Error("Error de red");
-            
-            const data = await response.json();
+        if (!response.ok) throw new Error("Error en red");
+        const data = await response.json();
 
-            if (!data.encontrado) {
-                sonidoError.play();
-                document.body.className = "flex items-center justify-center p-6 bg-error";
-                setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
-                return; 
-            }
-
-            if (data.acceso) {
-                if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
-                    sonidoError.play();
-                    mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
-                    return;
-                }
-                if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
-                
-                sonidoOk.play();
-                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
-                abrirPuertaReal();
-            } else {
-                sonidoError.play();
-                mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
-            }
-
-        } catch (err) { 
-            console.error("Fallo de conexión:", err);
-            document.getElementById('server-status').innerText = "🔴 ERROR API/CORS";
-        } finally {
-            if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+        if (!data.encontrado) {
+            reproducirSonido(sonidoError);
+            document.body.className = "flex items-center justify-center p-6 bg-error";
+            setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
+            return; 
         }
+
+        // LÓGICA DE ACCESO
+        if (data.acceso) {
+            if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
+                reproducirSonido(sonidoError);
+                mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
+                return;
+            }
+            
+            // Si todo está OK:
+            reproducirSonido(sonidoOk); // Si falla, no detiene el acceso
+            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
+            abrirPuertaReal(); // Ejecutar apertura
+            
+            if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
+        } else {
+            reproducirSonido(sonidoError);
+            mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
+        }
+
+    } catch (err) { 
+        console.error("Fallo crítico:", err);
+    } finally {
+        if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
     }
+}
 
     async function abrirPuertaReal() {
         try { fetch(LOCAL_BRIDGE_URL, { mode: 'no-cors' }); } catch (e) { }
