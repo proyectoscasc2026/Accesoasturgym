@@ -154,15 +154,16 @@ async function validarSocio(id) {
     if(sidebarSpinner) sidebarSpinner.classList.remove('hidden');
 
     try {
-        // Agregamos redirect: 'follow' para evitar bloqueos de Google
+        // ACTUALIZACIÓN AQUÍ: Agregamos las opciones de redirección
         const response = await fetch(`${GAS_URL}?id=${id}`, {
             method: 'GET',
             mode: 'cors',
             redirect: 'follow'
         });
 
-        if (!response.ok) throw new Error("Error en la respuesta del servidor");
-
+        // Verificamos si la respuesta es válida antes de procesar el JSON
+        if (!response.ok) throw new Error("Error en la respuesta de red");
+        
         const data = await response.json();
 
         if (!data.encontrado) {
@@ -178,7 +179,6 @@ async function validarSocio(id) {
                 mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
                 return;
             }
-
             if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
             
             sonidoOk.play();
@@ -191,13 +191,12 @@ async function validarSocio(id) {
 
     } catch (err) { 
         console.error("Fallo total de conexión:", err);
-        // Opcional: Alerta visual si internet se cayó
+        // Si hay error de conexión, mostramos una alerta visual
         document.getElementById('server-status').innerText = "🔴 ERROR API";
     } finally {
         if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
     }
 }
-
     async function abrirPuertaReal() {
         try { fetch(LOCAL_BRIDGE_URL); } catch (e) { }
     }
