@@ -160,6 +160,9 @@
                 // UI de Error (Fondo Rojo momentáneo)
                 document.body.className = "flex items-center justify-center p-6 bg-error";
                 setTimeout(() => document.body.className = "flex items-center justify-center p-6", 2000);
+                
+                // NUEVO: Registrar intento no encontrado
+                registrarIntentoEnSheet(id, "DNI NO ENCONTRADO");
                 return; 
             }
 
@@ -167,21 +170,53 @@
             if (data.acceso) {
                 if (data.tipo === "PASE" && invitadosQueYaEntraron.includes(data.dni)) {
                     mostrarUI({ nombre: "INVITADO (YA INGRESÓ)", dni: data.dni }, "PASE YA UTILIZADO HOY", false);
+                    registrarIntentoEnSheet(data.dni, "PASE YA UTILIZADO HOY");
                     return;
                 }
                 
                 mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, true);
                 abrirPuertaReal(); 
                 
+                // NUEVO: Registrar acceso autorizado
+                registrarIntentoEnSheet(data.dni, `AUTORIZADO (${data.status})`);
+                
                 if (data.tipo === "PASE") invitadosQueYaEntraron.push(data.dni);
             } else {
                 mostrarUI({ nombre: data.nombre, dni: data.dni }, data.status, false);
+                
+                // NUEVO: Registrar acceso denegado
+                registrarIntentoEnSheet(data.dni, `DENEGADO (${data.status})`);
             }
 
         } catch (err) { 
             console.error("Fallo crítico:", err);
         } finally {
             if(sidebarSpinner) sidebarSpinner.classList.add('hidden');
+        }
+    }
+
+    // NUEVA FUNCIÓN DE REGISTRO EN GOOGLE SHEETS
+    async function registrarIntentoEnSheet(dni, estado) {
+        try {
+            const ahora = new Date();
+            const fechaHora = ahora.toLocaleString();
+
+            const formData = new URLSearchParams();
+            formData.append('accion', 'registro_acceso');
+            formData.append('dni', dni);
+            formData.append('fechaHora', fechaHora);
+            formData.append('estado', estado);
+
+            await fetch(GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            });
+        } catch (e) {
+            console.error("Error al registrar en Google Sheets:", e);
         }
     }
 
